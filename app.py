@@ -19,7 +19,22 @@ load_dotenv()
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Any OpenRouter model slug works — override with OPENROUTER_MODEL in .env.
 MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+# Fallback key location, used when OPENROUTER_API_KEY is unset.
+DEFAULT_KEY_FILE = os.path.expanduser(
+    os.getenv("OPENROUTER_KEY_FILE", "~/.openrouter/keys/quantify_ai")
+)
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _api_key() -> str | None:
+    """Resolve the OpenRouter key: env var first, then the key file."""
+    key = os.getenv("OPENROUTER_API_KEY")
+    if key:
+        return key.strip()
+    try:
+        return Path(DEFAULT_KEY_FILE).read_text().strip() or None
+    except OSError:
+        return None
 
 SYSTEM_PROMPT = """You are a quantum computing engineer who writes production-quality Qiskit code.
 
@@ -63,7 +78,7 @@ class GenerateRequest(BaseModel):
 def _client() -> OpenAI:
     return OpenAI(
         base_url=OPENROUTER_BASE_URL,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
+        api_key=_api_key(),
         # Optional OpenRouter ranking headers.
         default_headers={"X-Title": "Quantify"},
     )
@@ -84,8 +99,11 @@ async def generate(req: GenerateRequest) -> StreamingResponse:
     effort = req.effort if req.effort in {"low", "medium", "high"} else "high"
 
     def events():
-        if not os.getenv("OPENROUTER_API_KEY"):
-            msg = "No OpenRouter API key. Set OPENROUTER_API_KEY in .env"
+        if not _api_key():
+            msg = (
+                "No OpenRouter API key. Set OPENROUTER_API_KEY, or place a key at "
+                f"{DEFAULT_KEY_FILE}"
+            )
             yield f"data: {json.dumps({'error': msg})}\n\n"
             return
         try:
@@ -139,7 +157,7 @@ async def health() -> dict:
     return {
         "ok": True,
         "model": MODEL,
-        "key_configured": bool(os.getenv("OPENROUTER_API_KEY")),
+        "key_configured": bool(_api_key()),
     }
 
 
