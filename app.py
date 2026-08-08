@@ -69,6 +69,15 @@ to run it on real hardware.
 app = FastAPI(title="Quantify")
 
 
+@app.middleware("http")
+async def no_store_assets(request, call_next):
+    """Keep the browser from serving a stale index/JS/CSS during iteration."""
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 class GenerateRequest(BaseModel):
     use_case: str = Field(min_length=3, max_length=4000)
     backend: str = "simulator"
