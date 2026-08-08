@@ -249,6 +249,38 @@ main { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
 }
 .ghost:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.25); }
 
+/* Circuit diagram */
+.circuit { margin: 14px 0 4px; }
+.circuit-cap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--accent-2);
+  margin-bottom: 8px;
+}
+.circuit-svg {
+  overflow-x: auto;
+  padding: 14px 12px;
+  background: var(--code-bg);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+}
+.circuit-svg svg { display: block; }
+.cg-wire { stroke: rgba(255, 255, 255, 0.22); stroke-width: 1.5; }
+.cg-cwire { stroke: rgba(255, 255, 255, 0.16); stroke-width: 1; }
+.cg-line { stroke: #cfc7ff; stroke-width: 1.8; }
+.cg-reg { fill: var(--muted); font: 600 12px ui-monospace, Menlo, monospace; }
+.cg-box { fill: rgba(124, 92, 255, 0.9); stroke: #b9a8ff; stroke-width: 1; }
+.cg-mbox { fill: rgba(38, 208, 196, 0.85); stroke: #7ff0e6; stroke-width: 1; }
+.cg-label { fill: #fff; font: 600 13px ui-sans-serif, system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; }
+.cg-ctrl { fill: #cfc7ff; }
+.cg-open { fill: none; stroke: #cfc7ff; stroke-width: 1.8; }
+.cg-arc { fill: none; stroke: #052; stroke-width: 1.6; }
+.cg-empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
+
 .out h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--accent-2); margin: 24px 0 8px; }
 .out h2:first-child { margin-top: 10px; }
 .out p { margin: 0 0 12px; color: #c9cde4; }

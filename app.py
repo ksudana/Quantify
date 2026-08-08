@@ -56,6 +56,34 @@ Respond in exactly this structure, with no preamble:
 ## Approach
 Two to four sentences on the algorithm and circuit design. Plain prose.
 
+## Circuit
+A JSON description of a small, concrete instance of the circuit, for rendering a
+diagram. Bind any parameters to actual numbers and keep it to <= 6 qubits.
+
+```json
+{
+  "qubits": 3,
+  "clbits": 3,
+  "gates": [
+    {"name": "h", "targets": [0]},
+    {"name": "cx", "controls": [0], "targets": [1]},
+    {"name": "rz", "targets": [2], "params": [1.5708]},
+    {"name": "measure", "targets": [0], "clbits": [0]}
+  ]
+}
+```
+
+JSON rules:
+- Ordered list of gates. Use lowercase Qiskit names: h, x, y, z, s, sdg, t, tdg,
+  sx, rx, ry, rz, p, cx, cy, cz, ch, crx, cry, crz, cp, ccx, swap, cswap,
+  measure, barrier.
+- Put control qubit(s) in `controls` and the acted-on qubit(s) in `targets`.
+  Omit `controls` when there are none.
+- `clbits` only on `measure`. `params` only for gates that take angles (numbers).
+- `barrier` needs no targets (it spans all qubits).
+- If the use case is variational/parameterized, show one representative layer with
+  example angles. If no meaningful static circuit exists, use "gates": [].
+
 ## Code
 ```python
 <the complete program>
