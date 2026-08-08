@@ -93,22 +93,71 @@ main { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
   margin-bottom: 8px;
 }
 
-textarea {
-  width: 100%;
-  resize: vertical;
-  padding: 14px 16px;
-  border-radius: 12px;
+/* Textarea with ghost-text autocomplete. The wrapper carries the visible
+   box (background/border/focus ring); the textarea and ghost layer share
+   identical metrics so the muted suggestion lines up under what you type. */
+.ta-wrap {
+  position: relative;
   border: 1px solid var(--stroke);
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.28);
-  color: var(--text);
-  font: inherit;
-  line-height: 1.55;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-textarea:focus {
-  outline: none;
+.ta-wrap:focus-within {
   border-color: rgba(124, 92, 255, 0.6);
   box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.14);
+}
+
+#usecase,
+.ghost-text {
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  background: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+#usecase {
+  position: relative;
+  display: block;
+  resize: vertical;
+  min-height: calc(1.55em * 5 + 28px);
+  color: var(--text);
+}
+#usecase:focus { outline: none; }
+
+.ghost-text {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  color: var(--muted);
+}
+.ghost-text .typed { color: transparent; } /* invisible spacer keeps alignment */
+
+.tab-hint {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(124, 92, 255, 0.12);
+  border: 1px solid rgba(124, 92, 255, 0.3);
+  padding: 3px 8px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+.tab-hint kbd {
+  font: inherit;
+  color: #cfc4ff;
+  font-weight: 600;
 }
 
 .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 18px; }

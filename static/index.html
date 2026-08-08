@@ -25,7 +25,11 @@
 <main>
   <section class="panel input-panel">
     <label class="field-label" for="usecase">Use case</label>
-    <textarea id="usecase" rows="5" placeholder="e.g. Estimate the ground-state energy of the H2 molecule with VQE"></textarea>
+    <div class="ta-wrap">
+      <div id="ghost" class="ghost-text" aria-hidden="true"></div>
+      <textarea id="usecase" rows="5" spellcheck="false"></textarea>
+      <span id="tabhint" class="tab-hint" hidden>press <kbd>Tab</kbd> to fill</span>
+    </div>
 
     <div class="examples" id="examples">
       <button data-ex="Create a 3-qubit GHZ state and verify the entanglement by measuring the correlations">GHZ state</button>

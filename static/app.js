@@ -28,7 +28,75 @@ $("examples").addEventListener("click", (e) => {
   if (!btn) return;
   usecase.value = btn.dataset.ex;
   usecase.focus();
+  updateGhost();
 });
+
+/* ---------- ghost-text autocomplete ---------- */
+
+const ghost = $("ghost");
+const tabHint = $("tabhint");
+// Single source of truth: the same use cases shown as example chips.
+const EXAMPLES = [...document.querySelectorAll("#examples button")].map(
+  (b) => b.dataset.ex,
+);
+
+let emptyIdx = 0;
+let suggestion = "";
+
+function computeSuggestion(v) {
+  if (v.length === 0) return EXAMPLES[emptyIdx % EXAMPLES.length];
+  const lv = v.toLowerCase();
+  return EXAMPLES.find((e) => e.length > v.length && e.toLowerCase().startsWith(lv)) || "";
+}
+
+function updateGhost() {
+  const v = usecase.value;
+  suggestion = computeSuggestion(v);
+  const remainder = suggestion ? suggestion.slice(v.length) : "";
+  ghost.replaceChildren();
+  if (!remainder) {
+    tabHint.hidden = true;
+    return;
+  }
+  const typed = document.createElement("span");
+  typed.className = "typed";
+  typed.textContent = v; // transparent spacer so remainder lines up
+  const rest = document.createElement("span");
+  rest.textContent = remainder;
+  ghost.append(typed, rest);
+  tabHint.hidden = false;
+}
+
+function acceptSuggestion() {
+  if (!suggestion || suggestion.length <= usecase.value.length) return false;
+  usecase.value = suggestion;
+  usecase.setSelectionRange(suggestion.length, suggestion.length);
+  updateGhost();
+  return true;
+}
+
+usecase.addEventListener("input", updateGhost);
+usecase.addEventListener("scroll", () => {
+  ghost.scrollTop = usecase.scrollTop;
+});
+usecase.addEventListener("keydown", (e) => {
+  // Only swallow Tab when we actually completed something — otherwise Tab
+  // keeps its normal focus-moving behavior.
+  if (e.key === "Tab" && !e.shiftKey && acceptSuggestion()) {
+    e.preventDefault();
+  }
+});
+
+// Cycle the empty-state suggestion so all examples are discoverable, but hold
+// steady while the box is focused so it can't shift out from under a Tab.
+setInterval(() => {
+  if (usecase.value.length === 0 && document.activeElement !== usecase) {
+    emptyIdx = (emptyIdx + 1) % EXAMPLES.length;
+    updateGhost();
+  }
+}, 4000);
+
+updateGhost();
 
 go.addEventListener("click", generate);
 document.addEventListener("keydown", (e) => {
