@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quantify — Qiskit code from plain language</title>
+<link rel="stylesheet" href="/static/style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>" />
+</head>
+<body>
+<div class="orb orb-a"></div>
+<div class="orb orb-b"></div>
+
+<header>
+  <div class="brand">
+    <span class="mark">⚛</span>
+    <div>
+      <h1>Quantify</h1>
+      <p class="tag">Describe a quantum use case. Get runnable Qiskit.</p>
+    </div>
+  </div>
+  <span class="pill" id="status">checking…</span>
+</header>
+
+<main>
+  <section class="panel input-panel">
+    <label class="field-label" for="usecase">Use case</label>
+    <textarea id="usecase" rows="5" placeholder="e.g. Estimate the ground-state energy of the H2 molecule with VQE"></textarea>
+
+    <div class="examples" id="examples">
+      <button data-ex="Create a 3-qubit GHZ state and verify the entanglement by measuring the correlations">GHZ state</button>
+      <button data-ex="Implement Grover's search over a 4-qubit database to find the marked item 1011">Grover search</button>
+      <button data-ex="Use QAOA to solve a Max-Cut problem on a 5-node graph">QAOA Max-Cut</button>
+      <button data-ex="Estimate the ground-state energy of the H2 molecule using VQE">VQE / H2</button>
+      <button data-ex="Demonstrate quantum teleportation of an arbitrary single-qubit state">Teleportation</button>
+      <button data-ex="Run Shor's period-finding subroutine to factor 15">Shor / factor 15</button>
+    </div>
+
+    <div class="controls">
+      <div class="seg" id="backend" data-value="simulator">
+        <span class="seg-label">Target</span>
+        <button class="active" data-v="simulator">Simulator</button>
+        <button data-v="hardware">IBM Hardware</button>
+      </div>
+      <div class="seg" id="effort" data-value="high">
+        <span class="seg-label">Depth</span>
+        <button data-v="low">Fast</button>
+        <button data-v="medium">Balanced</button>
+        <button class="active" data-v="high">Thorough</button>
+      </div>
+      <button id="go" class="go">Generate <kbd>⌘⏎</kbd></button>
+    </div>
+  </section>
+
+  <section class="panel output-panel" id="outPanel" hidden>
+    <div class="out-head">
+      <div class="out-title">
+        <span class="dot" id="dot"></span>
+        <span id="outLabel">Generating…</span>
+      </div>
+      <div class="out-actions">
+        <span class="usage" id="usage"></span>
+        <button id="copy" class="ghost">Copy code</button>
+        <button id="download" class="ghost">Download .py</button>
+      </div>
+    </div>
+    <article id="out" class="out"></article>
+  </section>
+</main>
+
+<footer>Powered by Claude Opus 5 · targets the modern Qiskit primitives API</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

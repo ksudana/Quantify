@@ -1,0 +1,6 @@
+.env
+.api_key.txt
+*.key
+.venv/
+__pycache__/
+.claude/settings.local.json
