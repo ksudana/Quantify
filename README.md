@@ -22,6 +22,6 @@ Open http://localhost:8000
 ## Notes
 
 - Powered by [OpenRouter](https://openrouter.ai). The API key stays server-side; the browser never sees it.
-- Model: set `OPENROUTER_MODEL` to any OpenRouter slug (default `anthropic/claude-sonnet-4.5`).
+- Model: set `OPENROUTER_MODEL` to any OpenRouter slug (default `openrouter/free`, which auto-routes to an available free model).
 - "Depth" maps to OpenRouter's `reasoning.effort` (low / medium / high); ignored by models that don't reason.
 - Generated code targets the modern Qiskit primitives API (no `execute()`, no legacy `Aer` import).

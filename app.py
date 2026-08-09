@@ -18,7 +18,8 @@ load_dotenv()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Any OpenRouter model slug works — override with OPENROUTER_MODEL in .env.
-MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+# "openrouter/free" auto-routes to an available free model.
+MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 # Fallback key location, used when OPENROUTER_API_KEY is unset.
 DEFAULT_KEY_FILE = os.path.expanduser(
     os.getenv("OPENROUTER_KEY_FILE", "~/.openrouter/keys/quantify_ai")
