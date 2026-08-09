@@ -15,6 +15,7 @@ const simPlayBtn = $("simPlay");
 const simStepBtn = $("simStep");
 const simRestartBtn = $("simRestart");
 const simStepLabel = $("simStepLabel");
+const simWarn = $("simWarn");
 const tip = $("tip");
 const tipTitle = $("tipTitle");
 const tipNote = $("tipNote");
@@ -34,6 +35,15 @@ const CTRL_BASE = {
   ch: "h", crx: "rx", cry: "ry", crz: "rz", cp: "p", cu: "u",
   cswap: "swap", fredkin: "swap",
 };
+
+// Resolve any controlled variant to the base gate acting on the target — cx/ccx/
+// mcx → x, cz/ccz/mcz → z, crz → rz, etc. Controls always come from `controls`.
+function baseGate(name) {
+  name = (name || "").toLowerCase();
+  if (CTRL_BASE[name]) return CTRL_BASE[name];
+  const m = name.match(/^m?c+(x|y|z|h|s|t|sx|rx|ry|rz|p|u1|swap)$/);
+  return m ? m[1] : name;
+}
 
 /* ---------- controls ---------- */
 
@@ -324,9 +334,9 @@ function renderCircuit(spec) {
 
     const inv = [...g.controls, ...g.targets].filter((n) => n >= 0 && n < nq);
     if (inv.length > 1) line(x, qy(Math.min(...inv)), x, qy(Math.max(...inv)));
-    for (const c of g.controls) if (c >= 0 && c < nq) ctrlDot(x, qy(c));
+    for (const c of g.controls) if (c >= 0 && c < nq && !g.targets.includes(c)) ctrlDot(x, qy(c));
 
-    const base = CTRL_BASE[g.name] || g.name;
+    const base = baseGate(g.name);
     for (const t of g.targets) {
       if (t < 0 || t >= nq) continue;
       if (base === "x") {
@@ -427,14 +437,23 @@ function applySwap(re, im, n, a, b, controls) {
 function applyGate(g) {
   const { re, im, n } = sim;
   if (g.name === "barrier" || g.name === "measure") return;
-  const base = CTRL_BASE[g.name] || g.name;
+  const base = baseGate(g.name);
+  // A qubit can't control itself — some models list the target inside controls
+  // (e.g. a symmetric MCZ as controls=[2,1,0], targets=[0]).
   if (base === "swap") {
-    if (g.targets.length >= 2) applySwap(re, im, n, g.targets[0], g.targets[1], g.controls);
+    if (g.targets.length >= 2) {
+      const ctrls = g.controls.filter((c) => !g.targets.includes(c));
+      applySwap(re, im, n, g.targets[0], g.targets[1], ctrls);
+    }
     return;
   }
   const U = gateMatrix(base, g.params);
   if (!U) return;
-  for (const t of g.targets) if (t >= 0 && t < n) applyU(re, im, n, t, g.controls, U);
+  for (const t of g.targets) {
+    if (t < 0 || t >= n) continue;
+    const ctrls = g.controls.filter((c) => c !== t);
+    applyU(re, im, n, t, ctrls, U);
+  }
 }
 
 const ketBits = (s, n) => {
@@ -555,12 +574,27 @@ function syncSimVisibility() {
     sim.moments = circuitModel.moments;
     sim.layout = circuitModel.layout;
     simPanel.hidden = false;
+    // Warn if any gate can't be modeled — otherwise it's silently skipped and
+    // the distribution would be wrong with no indication.
+    const unmodeled = [...new Set(
+      sim.moments.flat()
+        .filter((g) => g.name !== "measure" && g.name !== "barrier")
+        .filter((g) => baseGate(g.name) !== "swap" && !gateMatrix(baseGate(g.name)))
+        .map((g) => g.name),
+    )];
+    if (unmodeled.length) {
+      simWarn.textContent = `⚠ Simulation approximate — these gates aren't modeled and were skipped: ${unmodeled.join(", ")}. The distribution may be inaccurate.`;
+      simWarn.hidden = false;
+    } else {
+      simWarn.hidden = true;
+    }
     initSimRows();
     simReset();
     simPlay(); // animate the run as soon as the circuit is ready
   } else {
     simStop();
     simPanel.hidden = true;
+    simWarn.hidden = true;
   }
 }
 
@@ -598,7 +632,7 @@ const REFERENCE = {
 function gateRefKey(g) {
   const n = (g.name || "").toLowerCase();
   if (REFERENCE[n]) return n;
-  const base = CTRL_BASE[n] || n;
+  const base = baseGate(n);
   return REFERENCE[base] ? base : n;
 }
 
