@@ -17,10 +17,24 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-# Any OpenRouter model slug works — override with OPENROUTER_MODEL in .env.
-# A large free model — reliable enough to emit correct multi-stage circuits
-# (openrouter/free auto-routes to tiny models that often produce broken ones).
-MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
+
+# Vetted free models — each was checked to emit correct circuits for our test
+# cases (Bell, GHZ, 2- and 3-qubit Grover). Offering several means a per-model
+# rate limit on one doesn't block the app. The first entry is the default.
+MODELS = [
+    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "label": "Nemotron 3 Super 120B"},
+    {"id": "nvidia/nemotron-3-ultra-550b-a55b:free", "label": "Nemotron 3 Ultra 550B"},
+    {"id": "openai/gpt-oss-20b:free", "label": "GPT-OSS 20B"},
+]
+MODEL_IDS = {m["id"] for m in MODELS}
+
+# Override the default with OPENROUTER_MODEL in .env (any OpenRouter slug).
+MODEL = os.getenv("OPENROUTER_MODEL", MODELS[0]["id"])
+
+
+def _resolve_model(requested: str | None) -> str:
+    """Allow only vetted models from the client; fall back to the default."""
+    return requested if requested in MODEL_IDS else MODEL
 # Fallback key location, used when OPENROUTER_API_KEY is unset.
 DEFAULT_KEY_FILE = os.path.expanduser(
     os.getenv("OPENROUTER_KEY_FILE", "~/.openrouter/keys/quantify_ai")
@@ -114,6 +128,7 @@ class GenerateRequest(BaseModel):
     use_case: str = Field(min_length=3, max_length=4000)
     backend: str = "simulator"
     effort: str = "high"
+    model: str | None = None
 
 
 def _client() -> OpenAI:
@@ -138,6 +153,7 @@ def _user_prompt(req: GenerateRequest) -> str:
 @app.post("/api/generate")
 async def generate(req: GenerateRequest) -> StreamingResponse:
     effort = req.effort if req.effort in {"low", "medium", "high"} else "high"
+    model = _resolve_model(req.model)
 
     def events():
         if not _api_key():
@@ -150,7 +166,7 @@ async def generate(req: GenerateRequest) -> StreamingResponse:
         try:
             client = _client()
             stream = client.chat.completions.create(
-                model=MODEL,
+                model=model,
                 max_tokens=16000,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
@@ -171,7 +187,7 @@ async def generate(req: GenerateRequest) -> StreamingResponse:
                 delta = chunk.choices[0].delta.content
                 if delta:
                     yield f"data: {json.dumps({'delta': delta})}\n\n"
-            payload = {"done": True}
+            payload = {"done": True, "model": model}
             if usage is not None:
                 payload["usage"] = {
                     "input_tokens": usage.prompt_tokens,
@@ -200,6 +216,11 @@ async def health() -> dict:
         "model": MODEL,
         "key_configured": bool(_api_key()),
     }
+
+
+@app.get("/api/models")
+async def models() -> dict:
+    return {"models": MODELS, "default": MODEL}
 
 
 @app.get("/")

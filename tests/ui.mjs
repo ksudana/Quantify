@@ -159,6 +159,26 @@ async function simulate(spec) {
   }
 }
 
+// 9. Model selector: dropdown populates from /api/models and the chosen model
+//    is sent on generate (request intercepted, so no real model call).
+{
+  await page.waitForFunction(() => document.querySelectorAll("#model option").length >= 2, { timeout: 3000 });
+  const opts = await page.$$eval("#model option", (els) => els.map((e) => e.value));
+  ok(opts.length >= 2, `model dropdown populated (${opts.length} options)`);
+  const chosen = opts[opts.length - 1];
+  await page.selectOption("#model", chosen);
+  let sentModel = null;
+  await page.route("**/api/generate", async (route) => {
+    sentModel = JSON.parse(route.request().postData() || "{}").model;
+    await route.fulfill({ status: 200, contentType: "text/event-stream", body: `data: {"done":true,"model":"${chosen}"}\n\n` });
+  });
+  await page.fill("#usecase", "Create a Bell state");
+  await page.click("#go");
+  await page.waitForFunction(() => document.getElementById("outLabel").textContent === "Ready", { timeout: 5000 });
+  ok(sentModel === chosen, `chosen model sent to backend (${sentModel})`);
+  await page.unroute("**/api/generate");
+}
+
 ok(errors.length === 0, `no page/console errors${errors.length ? " -> " + errors.join(" | ") : ""}`);
 
 await browser.close();

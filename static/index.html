@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Quantify — Qiskit code from plain language</title>
-<link rel="stylesheet" href="/static/style.css?v=5" />
+<link rel="stylesheet" href="/static/style.css?v=6" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>" />
 </head>
 <body>
@@ -55,6 +55,10 @@
         <button data-v="medium">Balanced</button>
         <button class="active" data-v="high">Thorough</button>
       </div>
+      <label class="model-pick">
+        <span class="seg-label">Model</span>
+        <select id="model" title="All free; each vetted on the test suite"></select>
+      </label>
       <button id="go" class="go">Generate <kbd>⌘⏎</kbd></button>
     </div>
   </section>
@@ -116,6 +120,6 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=5"></script>
+<script src="/static/app.js?v=6"></script>
 </body>
 </html>

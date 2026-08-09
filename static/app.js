@@ -770,6 +770,7 @@ async function generate() {
         use_case: text,
         backend: $("backend").dataset.value,
         effort: $("effort").dataset.value,
+        model: $("model").value || undefined,
       }),
     });
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -853,14 +854,14 @@ $("saveSvg").addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-/* ---------- health ---------- */
+/* ---------- health + model list ---------- */
 
 fetch("/api/health")
   .then((r) => r.json())
   .then((h) => {
     const el = $("status");
     if (h.key_configured) {
-      el.textContent = `● ${h.model}`;
+      el.textContent = "● ready";
       el.className = "pill ok";
     } else {
       el.textContent = "no API key — set OPENROUTER_API_KEY";
@@ -871,3 +872,21 @@ fetch("/api/health")
     $("status").textContent = "offline";
     $("status").className = "pill warn";
   });
+
+// Populate the model dropdown from the vetted list; remember the user's choice.
+fetch("/api/models")
+  .then((r) => r.json())
+  .then(({ models, default: def }) => {
+    const sel = $("model");
+    sel.replaceChildren();
+    for (const m of models) {
+      const o = document.createElement("option");
+      o.value = m.id;
+      o.textContent = m.label;
+      sel.append(o);
+    }
+    const saved = localStorage.getItem("quantify.model");
+    sel.value = models.some((m) => m.id === saved) ? saved : def;
+    sel.addEventListener("change", () => localStorage.setItem("quantify.model", sel.value));
+  })
+  .catch(() => {});
