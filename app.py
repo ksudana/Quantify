@@ -18,8 +18,9 @@ load_dotenv()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Any OpenRouter model slug works — override with OPENROUTER_MODEL in .env.
-# "openrouter/free" auto-routes to an available free model.
-MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+# A large free model — reliable enough to emit correct multi-stage circuits
+# (openrouter/free auto-routes to tiny models that often produce broken ones).
+MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free")
 # Fallback key location, used when OPENROUTER_API_KEY is unset.
 DEFAULT_KEY_FILE = os.path.expanduser(
     os.getenv("OPENROUTER_KEY_FILE", "~/.openrouter/keys/quantify_ai")
