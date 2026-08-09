@@ -9,10 +9,31 @@ const go = $("go");
 const usage = $("usage");
 const circuitPanel = $("circuit");
 const circuitSvg = $("circuitSvg");
+const simPanel = $("sim");
+const simStateEl = $("simState");
+const simPlayBtn = $("simPlay");
+const simStepBtn = $("simStep");
+const simRestartBtn = $("simRestart");
+const simStepLabel = $("simStepLabel");
+const tip = $("tip");
+const tipTitle = $("tipTitle");
+const tipNote = $("tipNote");
+const tipLink = $("tipLink");
+const refOverlay = $("ref");
+const refBody = $("refBody");
 
 let raw = "";
 let busy = false;
 let lastCircuitJson = "";
+let circuitModel = null;
+let simPlaying = false;
+
+// Controlled gate → the base gate that acts on the target.
+const CTRL_BASE = {
+  cx: "x", cnot: "x", ccx: "x", toffoli: "x", mcx: "x", cy: "y", cz: "z",
+  ch: "h", crx: "rx", cry: "ry", crz: "rz", cp: "p", cu: "u",
+  cswap: "swap", fredkin: "swap",
+};
 
 /* ---------- controls ---------- */
 
@@ -23,6 +44,7 @@ for (const seg of document.querySelectorAll(".seg")) {
     seg.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     seg.dataset.value = btn.dataset.v;
+    if (seg.id === "backend") syncSimVisibility();
   });
 }
 
@@ -110,6 +132,7 @@ document.addEventListener("keydown", (e) => {
 
 const esc = (s) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escAttr = (s) => esc(String(s)).replace(/"/g, "&quot;");
 
 // Minimal markdown for the fixed response shape: ## headings, ```python fences,
 // - bullets, `inline code`. Everything is escaped before any tag is inserted.
@@ -186,6 +209,8 @@ function renderCircuit(spec) {
   const gates = Array.isArray(spec.gates) ? spec.gates : [];
   if (!nq || gates.length === 0) {
     circuitSvg.innerHTML = `<div class="cg-empty">No circuit diagram for this use case.</div>`;
+    circuitModel = null;
+    syncSimVisibility();
     return;
   }
   const nc = Math.max(0, spec.clbits | 0);
@@ -201,6 +226,7 @@ function renderCircuit(spec) {
     targets: [].concat(g.targets ?? g.target ?? []).map((n) => n | 0),
     clbits: [].concat(g.clbits ?? g.clbit ?? []).map((n) => n | 0),
     params: [].concat(g.params ?? []),
+    note: typeof g.note === "string" ? g.note : "",
   });
 
   // Greedy moment packing: place each gate in the leftmost column whose rows
@@ -229,6 +255,8 @@ function renderCircuit(spec) {
   const W = LEFT + ncols * COLW + 14;
   const H = TOP * 2 + (nq + nc) * ROWH;
   const P = [];
+  // Column highlight band the simulator moves as it steps (behind everything).
+  P.push(`<rect id="cg-hl" x="${LEFT}" y="${TOP}" width="${COLW}" height="${(nq + nc) * ROWH}" rx="6" class="cg-hl" style="opacity:0"/>`);
 
   const line = (x1, y1, x2, y2, cls = "cg-line") =>
     P.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`);
@@ -265,12 +293,6 @@ function renderCircuit(spec) {
     line(LEFT - 6, cyc(j) + 1.5, W - 6, cyc(j) + 1.5, "cg-cwire");
   }
 
-  // Controlled gate → base gate drawn on the target.
-  const CTRL_BASE = {
-    cx: "x", cnot: "x", ccx: "x", toffoli: "x", mcx: "x", cy: "y", cz: "z",
-    ch: "h", crx: "rx", cry: "ry", crz: "rz", cp: "p", cu: "u",
-    cswap: "swap", fredkin: "swap",
-  };
   const fmtP = (g) =>
     g.params.length
       ? "(" + g.params.map((v) => (Number.isFinite(+v) ? Math.round(+v * 100) / 100 : v)).join(",") + ")"
@@ -278,8 +300,11 @@ function renderCircuit(spec) {
 
   for (const { g, col } of placed) {
     const x = colX(col);
+    // Wrap each gate so it's a single hover target with its own explanation.
+    P.push(`<g class="cg-gate" data-gate="${escAttr(gateRefKey(g))}" data-title="${escAttr(gateTitle(g))}" data-note="${escAttr(g.note || "")}">`);
     if (g.name === "barrier") {
       P.push(`<line x1="${x}" y1="${qy(0) - ROWH / 2 + 6}" x2="${x}" y2="${qy(nq - 1) + ROWH / 2 - 6}" class="cg-barrier"/>`);
+      P.push(`</g>`);
       continue;
     }
     if (g.name === "measure") {
@@ -293,6 +318,7 @@ function renderCircuit(spec) {
           P.push(`<path d="M ${x - 4} ${cyc(cj) - 6} L ${x} ${cyc(cj)} L ${x + 4} ${cyc(cj) - 6}" fill="none" class="cg-line"/>`);
         }
       }
+      P.push(`</g>`);
       continue;
     }
 
@@ -312,11 +338,14 @@ function renderCircuit(spec) {
         boxAt(x, qy(t), base.toUpperCase() + fmtP(g));
       }
     }
+    P.push(`</g>`);
   }
 
   const style = `<style>
-    .cg-wire{stroke:rgba(160,170,210,.5);stroke-width:1.5}
-    .cg-cwire{stroke:rgba(160,170,210,.35);stroke-width:1}
+    .cg-wire{stroke:rgba(160,170,210,.5);stroke-width:1.5;pointer-events:none}
+    .cg-cwire{stroke:rgba(160,170,210,.35);stroke-width:1;pointer-events:none}
+    .cg-hl{pointer-events:none}
+    .cg-gate{cursor:pointer}
     .cg-line{stroke:#8f7bff;stroke-width:1.8}
     .cg-barrier{stroke:rgba(255,255,255,.28);stroke-width:1.4;stroke-dasharray:4 3}
     .cg-reg{fill:#8a90ad;font:600 12px ui-monospace,Menlo,monospace;dominant-baseline:central}
@@ -326,10 +355,350 @@ function renderCircuit(spec) {
     .cg-ctrl{fill:#8f7bff}
     .cg-open{fill:none;stroke:#8f7bff;stroke-width:1.8}
     .cg-arc{fill:none;stroke:#053b36;stroke-width:1.6}
+    .cg-hl{fill:rgba(124,92,255,.18)}
   </style>`;
   circuitSvg.innerHTML =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${style}${P.join("")}</svg>`;
+
+  // Group gates into moments (columns) for the simulator, and publish the model.
+  const moments = Array.from({ length: ncols }, () => []);
+  for (const { g, col } of placed) moments[col].push(g);
+  circuitModel = { nq, nc, moments, ncols, layout: { LEFT, COLW } };
+  syncSimVisibility();
 }
+
+/* ---------- in-browser statevector simulator ---------- */
+
+const SQ = Math.SQRT1_2;
+// Complex 2x2 gate as [u00re,u00im, u01re,u01im, u10re,u10im, u11re,u11im].
+function gateMatrix(name, params) {
+  const a = params && params.length ? +params[0] : 0;
+  switch (name) {
+    case "h": return [SQ, 0, SQ, 0, SQ, 0, -SQ, 0];
+    case "x": return [0, 0, 1, 0, 1, 0, 0, 0];
+    case "y": return [0, 0, 0, -1, 0, 1, 0, 0];
+    case "z": return [1, 0, 0, 0, 0, 0, -1, 0];
+    case "s": return [1, 0, 0, 0, 0, 0, 0, 1];
+    case "sdg": return [1, 0, 0, 0, 0, 0, 0, -1];
+    case "t": return [1, 0, 0, 0, 0, 0, Math.cos(Math.PI / 4), Math.sin(Math.PI / 4)];
+    case "tdg": return [1, 0, 0, 0, 0, 0, Math.cos(Math.PI / 4), -Math.sin(Math.PI / 4)];
+    case "sx": return [0.5, 0.5, 0.5, -0.5, 0.5, -0.5, 0.5, 0.5];
+    case "id": case "i": return [1, 0, 0, 0, 0, 0, 1, 0];
+    case "rx": { const c = Math.cos(a / 2), s = Math.sin(a / 2); return [c, 0, 0, -s, 0, -s, c, 0]; }
+    case "ry": { const c = Math.cos(a / 2), s = Math.sin(a / 2); return [c, 0, -s, 0, s, 0, c, 0]; }
+    case "rz": { const c = Math.cos(a / 2), s = Math.sin(a / 2); return [c, -s, 0, 0, 0, 0, c, s]; }
+    case "p": case "u1": { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, 0, 0, c, s]; }
+    default: return null;
+  }
+}
+
+const sim = { re: null, im: null, n: 0, moments: [], step: 0, timer: null, rows: [], layout: null };
+
+function applyU(re, im, n, target, controls, U) {
+  const tb = 1 << target, size = 1 << n;
+  let cmask = 0;
+  for (const c of controls) cmask |= 1 << c;
+  for (let s = 0; s < size; s++) {
+    if (s & tb) continue;
+    if ((s & cmask) !== cmask) continue;
+    const s0 = s, s1 = s | tb;
+    const ar = re[s0], ai = im[s0], br = re[s1], bi = im[s1];
+    re[s0] = U[0] * ar - U[1] * ai + U[2] * br - U[3] * bi;
+    im[s0] = U[0] * ai + U[1] * ar + U[2] * bi + U[3] * br;
+    re[s1] = U[4] * ar - U[5] * ai + U[6] * br - U[7] * bi;
+    im[s1] = U[4] * ai + U[5] * ar + U[6] * bi + U[7] * br;
+  }
+}
+
+function applySwap(re, im, n, a, b, controls) {
+  const ta = 1 << a, tb = 1 << b, size = 1 << n;
+  let cmask = 0;
+  for (const c of controls) cmask |= 1 << c;
+  for (let s = 0; s < size; s++) {
+    if ((s & cmask) !== cmask) continue;
+    if ((s & ta) === 0 && (s & tb) !== 0) {
+      const p = (s | ta) & ~tb;
+      let t = re[s]; re[s] = re[p]; re[p] = t;
+      t = im[s]; im[s] = im[p]; im[p] = t;
+    }
+  }
+}
+
+function applyGate(g) {
+  const { re, im, n } = sim;
+  if (g.name === "barrier" || g.name === "measure") return;
+  const base = CTRL_BASE[g.name] || g.name;
+  if (base === "swap") {
+    if (g.targets.length >= 2) applySwap(re, im, n, g.targets[0], g.targets[1], g.controls);
+    return;
+  }
+  const U = gateMatrix(base, g.params);
+  if (!U) return;
+  for (const t of g.targets) if (t >= 0 && t < n) applyU(re, im, n, t, g.controls, U);
+}
+
+const ketBits = (s, n) => {
+  let out = "";
+  for (let i = n - 1; i >= 0; i--) out += (s >> i) & 1;
+  return out;
+};
+
+function initSimRows() {
+  const size = 1 << sim.n;
+  simStateEl.replaceChildren();
+  sim.rows = [];
+  for (let s = 0; s < size; s++) {
+    const row = document.createElement("div");
+    row.className = "sim-row";
+    const ket = document.createElement("span");
+    ket.className = "sim-ket";
+    ket.textContent = `|${ketBits(s, sim.n)}⟩`;
+    const wrap = document.createElement("div");
+    wrap.className = "sim-barwrap";
+    const bar = document.createElement("div");
+    bar.className = "sim-bar";
+    wrap.append(bar);
+    const pct = document.createElement("span");
+    pct.className = "sim-pct";
+    pct.textContent = "0%";
+    row.append(ket, wrap, pct);
+    simStateEl.append(row);
+    sim.rows.push({ row, bar, pct });
+  }
+}
+
+function renderSimState() {
+  const { re, im, n } = sim, size = 1 << n;
+  for (let s = 0; s < size; s++) {
+    const p = re[s] * re[s] + im[s] * im[s];
+    const { row, bar, pct } = sim.rows[s];
+    bar.style.width = (p * 100).toFixed(1) + "%";
+    if (p > 1e-6) {
+      const phase = Math.atan2(im[s], re[s]);
+      const hue = ((phase * 180) / Math.PI + 360) % 360;
+      bar.style.background = `hsl(${hue.toFixed(0)},70%,58%)`;
+      row.style.opacity = "1";
+      const sign = im[s] >= 0 ? "+" : "";
+      row.title = `amplitude ${re[s].toFixed(3)}${sign}${im[s].toFixed(3)}i · ${(p * 100).toFixed(1)}% · phase ${((phase * 180) / Math.PI).toFixed(0)}°`;
+    } else {
+      bar.style.background = "rgba(255,255,255,0.12)";
+      row.style.opacity = "0.45";
+      row.title = "0%";
+    }
+    pct.textContent = (p * 100).toFixed(1) + "%";
+  }
+}
+
+function highlightColumn(col) {
+  const hl = circuitSvg.querySelector("#cg-hl");
+  if (!hl || !sim.layout) return;
+  if (col < 0) { hl.style.opacity = "0"; return; }
+  hl.setAttribute("x", sim.layout.LEFT + col * sim.layout.COLW);
+  hl.style.opacity = "1";
+}
+
+function updateSimLabel() {
+  simStepLabel.textContent = `moment ${sim.step} / ${sim.moments.length}`;
+}
+
+function simReset() {
+  simPause();
+  const size = 1 << sim.n;
+  sim.re = new Float64Array(size);
+  sim.im = new Float64Array(size);
+  sim.re[0] = 1;
+  sim.step = 0;
+  highlightColumn(-1);
+  renderSimState();
+  updateSimLabel();
+}
+
+function simStepForward() {
+  if (sim.step >= sim.moments.length) return false;
+  const col = sim.step;
+  for (const g of sim.moments[col]) applyGate(g);
+  highlightColumn(col);
+  sim.step = col + 1;
+  renderSimState();
+  updateSimLabel();
+  if (sim.step >= sim.moments.length) simPause();
+  return true;
+}
+
+function simPlay() {
+  if (sim.step >= sim.moments.length) simReset();
+  if (sim.timer) return;
+  simPlaying = true;
+  simPlayBtn.textContent = "⏸ Pause";
+  sim.timer = setInterval(() => {
+    if (!simStepForward()) simPause();
+  }, 650);
+}
+
+function simPause() {
+  if (sim.timer) { clearInterval(sim.timer); sim.timer = null; }
+  simPlaying = false;
+  simPlayBtn.textContent = "▶ Play";
+}
+
+function simStop() {
+  simPause();
+  sim.step = 0;
+}
+
+// Show/hide + (re)load the simulator based on the target toggle and circuit.
+function syncSimVisibility() {
+  const isSim = $("backend").dataset.value === "simulator";
+  const hasCircuit = circuitModel && circuitModel.nq > 0 && circuitModel.moments.length > 0;
+  if (isSim && hasCircuit) {
+    sim.n = circuitModel.nq;
+    sim.moments = circuitModel.moments;
+    sim.layout = circuitModel.layout;
+    simPanel.hidden = false;
+    initSimRows();
+    simReset();
+    simPlay(); // animate the run as soon as the circuit is ready
+  } else {
+    simStop();
+    simPanel.hidden = true;
+  }
+}
+
+simPlayBtn.addEventListener("click", () => (simPlaying ? simPause() : simPlay()));
+simStepBtn.addEventListener("click", () => { simPause(); simStepForward(); });
+simRestartBtn.addEventListener("click", () => simReset());
+
+/* ---------- gate reference + hover tooltips ---------- */
+
+const REFERENCE = {
+  h: { name: "Hadamard Gate", sym: "H", desc: "Creates an equal superposition — it maps |0⟩ to (|0⟩+|1⟩)/√2 and |1⟩ to (|0⟩−|1⟩)/√2. The standard way to put a qubit into superposition and to switch between the computational and ± bases." },
+  x: { name: "Pauli-X Gate", sym: "X", desc: "The quantum NOT: swaps |0⟩ and |1⟩. A rotation by π about the X axis of the Bloch sphere." },
+  y: { name: "Pauli-Y Gate", sym: "Y", desc: "A combined bit-and-phase flip: rotation by π about the Y axis, mapping |0⟩→i|1⟩ and |1⟩→−i|0⟩." },
+  z: { name: "Pauli-Z Gate", sym: "Z", desc: "A phase flip: leaves |0⟩ unchanged and multiplies |1⟩ by −1. Rotation by π about the Z axis." },
+  s: { name: "S Gate", sym: "S", desc: "Quarter-turn phase gate: adds a +90° (factor i) phase to |1⟩. Equal to √Z." },
+  sdg: { name: "S† Gate", sym: "S†", desc: "Inverse of the S gate: adds a −90° phase to |1⟩." },
+  t: { name: "T Gate", sym: "T", desc: "Eighth-turn phase gate: adds a +45° phase to |1⟩. Equal to √S and central to universal fault-tolerant gate sets." },
+  tdg: { name: "T† Gate", sym: "T†", desc: "Inverse of the T gate: adds a −45° phase to |1⟩." },
+  sx: { name: "√X Gate", sym: "SX", desc: "Square root of NOT — applied twice it equals X. A common hardware-native gate." },
+  rx: { name: "RX Rotation", sym: "RX(θ)", desc: "Rotates the qubit by angle θ about the X axis of the Bloch sphere." },
+  ry: { name: "RY Rotation", sym: "RY(θ)", desc: "Rotates the qubit by angle θ about the Y axis — useful for real-valued superpositions with tunable amplitudes." },
+  rz: { name: "RZ Rotation", sym: "RZ(θ)", desc: "Rotates the qubit by angle θ about the Z axis, applying a relative phase between |0⟩ and |1⟩." },
+  p: { name: "Phase Gate", sym: "P(λ)", desc: "Applies a relative phase e^{iλ} to |1⟩ while leaving |0⟩ unchanged." },
+  cx: { name: "CNOT Gate", sym: "CX", desc: "Controlled-NOT: flips the target qubit if and only if the control qubit is |1⟩. The workhorse entangling gate." },
+  cz: { name: "Controlled-Z Gate", sym: "CZ", desc: "Applies a −1 phase only when both qubits are |1⟩. Symmetric between its two qubits and entangling." },
+  cy: { name: "Controlled-Y Gate", sym: "CY", desc: "Applies a Y gate to the target when the control qubit is |1⟩." },
+  ch: { name: "Controlled-H Gate", sym: "CH", desc: "Applies a Hadamard to the target when the control qubit is |1⟩." },
+  ccx: { name: "Toffoli Gate", sym: "CCX", desc: "Controlled-controlled-NOT: flips the target only when both controls are |1⟩. Enables reversible classical logic such as AND." },
+  swap: { name: "SWAP Gate", sym: "SWAP", desc: "Exchanges the states of two qubits." },
+  cswap: { name: "Fredkin Gate", sym: "CSWAP", desc: "Controlled-SWAP: swaps two target qubits when the control is |1⟩." },
+  measure: { name: "Measurement", sym: "", desc: "Reads a qubit in the computational basis, collapsing it to 0 or 1 with probabilities given by the squared amplitudes, and stores the outcome in a classical bit." },
+  barrier: { name: "Barrier", sym: "", desc: "Not a physical operation — it stops the compiler from reordering or optimizing across it and visually separates stages of a circuit." },
+};
+
+function gateRefKey(g) {
+  const n = (g.name || "").toLowerCase();
+  if (REFERENCE[n]) return n;
+  const base = CTRL_BASE[n] || n;
+  return REFERENCE[base] ? base : n;
+}
+
+function gateTitle(g) {
+  const n = (g.name || "").toLowerCase();
+  const key = gateRefKey(g);
+  const base = REFERENCE[key] ? REFERENCE[key].name : n.toUpperCase() + " Gate";
+  // Controlled variant that has no dedicated reference entry (e.g. CRZ) → mark it.
+  if (!REFERENCE[n] && (CTRL_BASE[n] || (g.controls && g.controls.length))) {
+    return "Controlled " + base;
+  }
+  return base;
+}
+
+let tipTimer = null;
+
+function showTip(gel) {
+  clearTimeout(tipTimer);
+  const key = gel.dataset.gate;
+  const ref = REFERENCE[key];
+  const title = gel.dataset.title || (ref ? ref.name : key);
+  tipTitle.textContent = title;
+  const note = gel.dataset.note;
+  tipNote.textContent = note && note.length ? note : ref ? ref.desc : "";
+  tipLink.textContent = `Reference: ${ref ? ref.name : title} →`;
+  tipLink.onclick = (e) => { e.preventDefault(); hideTipNow(); openReference(key); };
+  tip.hidden = false;
+  const r = gel.getBoundingClientRect();
+  const t = tip.getBoundingClientRect();
+  let left = r.left + r.width / 2 - t.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - t.width - 8));
+  let top = r.top - t.height - 10;
+  if (top < 8) top = r.bottom + 10;
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+}
+
+function scheduleHideTip() {
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(hideTipNow, 140);
+}
+function hideTipNow() {
+  tip.hidden = true;
+}
+
+circuitSvg.addEventListener("mouseover", (e) => {
+  const g = e.target.closest(".cg-gate");
+  if (g) showTip(g);
+});
+circuitSvg.addEventListener("mouseout", (e) => {
+  if (e.target.closest(".cg-gate")) scheduleHideTip();
+});
+tip.addEventListener("mouseenter", () => clearTimeout(tipTimer));
+tip.addEventListener("mouseleave", hideTipNow);
+
+/* ---------- reference overlay ---------- */
+
+function buildReference() {
+  refBody.replaceChildren();
+  for (const [key, r] of Object.entries(REFERENCE)) {
+    const sec = document.createElement("section");
+    sec.className = "ref-item";
+    sec.id = "ref-" + key;
+    const h = document.createElement("h3");
+    h.textContent = r.name;
+    if (r.sym) {
+      const sp = document.createElement("span");
+      sp.className = "ref-sym";
+      sp.textContent = r.sym;
+      h.append(sp);
+    }
+    const p = document.createElement("p");
+    p.textContent = r.desc;
+    sec.append(h, p);
+    refBody.append(sec);
+  }
+}
+
+function openReference(key) {
+  refOverlay.hidden = false;
+  const el = key && document.getElementById("ref-" + key);
+  if (el) {
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("ref-hi");
+    setTimeout(() => el.classList.remove("ref-hi"), 1500);
+  }
+}
+function closeReference() {
+  refOverlay.hidden = true;
+}
+
+$("refBtn").addEventListener("click", () => openReference(null));
+$("refClose").addEventListener("click", closeReference);
+refOverlay.addEventListener("click", (e) => {
+  if (e.target === refOverlay) closeReference();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeReference();
+});
+buildReference();
 
 /* ---------- generate ---------- */
 
@@ -342,11 +711,15 @@ async function generate() {
   go.disabled = true;
   raw = "";
   lastCircuitJson = "";
+  circuitModel = null;
   usage.textContent = "";
   outPanel.hidden = false;
   out.innerHTML = "";
   circuitPanel.hidden = true;
   circuitSvg.innerHTML = "";
+  simStop();
+  simPanel.hidden = true;
+  hideTipNow();
   dot.className = "dot live";
   outLabel.textContent = "Generating…";
   outPanel.scrollIntoView({ behavior: "smooth", block: "start" });

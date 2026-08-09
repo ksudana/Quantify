@@ -65,10 +65,10 @@ diagram. Bind any parameters to actual numbers and keep it to <= 6 qubits.
   "qubits": 3,
   "clbits": 3,
   "gates": [
-    {"name": "h", "targets": [0]},
-    {"name": "cx", "controls": [0], "targets": [1]},
-    {"name": "rz", "targets": [2], "params": [1.5708]},
-    {"name": "measure", "targets": [0], "clbits": [0]}
+    {"name": "h", "targets": [0], "note": "Puts the control qubit into superposition so the GHZ state can form."},
+    {"name": "cx", "controls": [0], "targets": [1], "note": "Entangles qubit 1 with qubit 0."},
+    {"name": "rz", "targets": [2], "params": [1.5708], "note": "Applies the phase this algorithm needs."},
+    {"name": "measure", "targets": [0], "clbits": [0], "note": "Reads out qubit 0 into a classical bit."}
   ]
 }
 ```
@@ -81,6 +81,8 @@ JSON rules:
   Omit `controls` when there are none.
 - `clbits` only on `measure`. `params` only for gates that take angles (numbers).
 - `barrier` needs no targets (it spans all qubits).
+- Add a short `note` (one sentence) to every gate explaining its specific role
+  in THIS circuit — contextual to the use case, not a generic definition.
 - If the use case is variational/parameterized, show one representative layer with
   example angles. If no meaningful static circuit exists, use "gates": [].
 

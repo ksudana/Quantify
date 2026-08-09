@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Quantify — Qiskit code from plain language</title>
-<link rel="stylesheet" href="/static/style.css?v=2" />
+<link rel="stylesheet" href="/static/style.css?v=3" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>" />
 </head>
 <body>
@@ -19,7 +19,10 @@
       <p class="tag">Describe a quantum use case. Get runnable Qiskit.</p>
     </div>
   </div>
-  <span class="pill" id="status">checking…</span>
+  <div class="head-right">
+    <button id="refBtn" class="ghost">Reference</button>
+    <span class="pill" id="status">checking…</span>
+  </div>
 </header>
 
 <main>
@@ -76,12 +79,42 @@
       <div id="circuitSvg" class="circuit-svg"></div>
     </div>
 
+    <div id="sim" class="sim" hidden>
+      <div class="sim-cap">
+        <span>Simulator</span>
+        <div class="sim-ctrls">
+          <button id="simPlay" class="ghost">▶ Play</button>
+          <button id="simStep" class="ghost">Step</button>
+          <button id="simRestart" class="ghost">Restart</button>
+          <span id="simStepLabel" class="sim-step"></span>
+        </div>
+      </div>
+      <div id="simState" class="sim-state"></div>
+      <div class="sim-note">Statevector simulation running in your browser · bar length = probability, color = relative phase</div>
+    </div>
+
     <article id="out" class="out"></article>
   </section>
 </main>
 
 <footer>Powered by Claude Opus 5 · targets the modern Qiskit primitives API</footer>
 
-<script src="/static/app.js?v=2"></script>
+<div id="tip" class="tip" hidden>
+  <div class="tip-title" id="tipTitle"></div>
+  <div class="tip-note" id="tipNote"></div>
+  <a class="tip-link" id="tipLink" href="#">Reference →</a>
+</div>
+
+<div id="ref" class="ref-overlay" hidden>
+  <div class="ref-card">
+    <div class="ref-head">
+      <h2>Reference</h2>
+      <button id="refClose" class="ghost">Close</button>
+    </div>
+    <div class="ref-body" id="refBody"></div>
+  </div>
+</div>
+
+<script src="/static/app.js?v=3"></script>
 </body>
 </html>
