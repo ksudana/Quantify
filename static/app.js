@@ -239,25 +239,29 @@ function renderCircuit(spec) {
     note: typeof g.note === "string" ? g.note : "",
   });
 
-  // Greedy moment packing: place each gate in the leftmost column whose rows
-  // (min..max of the qubits it spans) are free.
+  // Moment layering (ASAP). A gate must come no earlier than every qubit it
+  // *actually* touches is free — this preserves per-qubit gate order, which the
+  // simulator relies on. Within that constraint we pick the leftmost column
+  // whose full visual span (min..max row) is clear, so the diagram stays tidy.
   const cols = [];
+  const qubitLast = new Array(nq).fill(-1); // last column each qubit was used in
   const placed = gates.map(norm).map((g) => {
-    let lo, hi;
-    if (g.name === "barrier") { lo = 0; hi = nq - 1; }
-    else {
-      const inv = [...g.controls, ...g.targets].filter((n) => n >= 0 && n < nq);
-      lo = inv.length ? Math.min(...inv) : 0;
-      hi = inv.length ? Math.max(...inv) : 0;
-    }
-    let c = 0;
+    let actual;
+    if (g.name === "barrier") actual = [...Array(nq).keys()];
+    else actual = [...g.controls, ...g.targets].filter((n) => n >= 0 && n < nq);
+    const lo = actual.length ? Math.min(...actual) : 0;
+    const hi = actual.length ? Math.max(...actual) : 0;
+    let minCol = 0;
+    for (const q of actual) minCol = Math.max(minCol, qubitLast[q] + 1);
+    let c = minCol;
     for (; c < cols.length; c++) {
       let free = true;
       for (let r = lo; r <= hi; r++) if (cols[c][r]) { free = false; break; }
       if (free) break;
     }
-    if (c === cols.length) cols[c] = new Array(nq).fill(false);
+    while (cols.length <= c) cols.push(new Array(nq).fill(false));
     for (let r = lo; r <= hi; r++) cols[c][r] = true;
+    for (const q of actual) qubitLast[q] = c;
     return { g, col: c };
   });
 

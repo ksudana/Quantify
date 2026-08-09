@@ -1,0 +1,14 @@
+{
+  "name": "quantify",
+  "version": "1.0.0",
+  "description": "Playwright UI tests for Quantify (the app itself is Python/FastAPI).",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/ui.mjs"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

@@ -19,6 +19,18 @@ uvicorn app:app --reload --port 8000
 
 Open http://localhost:8000
 
+## Tests
+
+Real-browser UI tests (simulator correctness, circuit diagram, hover tooltips,
+Reference overlay) via Playwright, run against a live server:
+
+```bash
+npm install
+npx playwright install chromium
+# with the app running on :8000
+npm test
+```
+
 ## Notes
 
 - Powered by [OpenRouter](https://openrouter.ai). The API key stays server-side; the browser never sees it.
