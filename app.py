@@ -24,7 +24,6 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 MODELS = [
     {"id": "nvidia/nemotron-3-super-120b-a12b:free", "label": "Nemotron 3 Super 120B"},
     {"id": "nvidia/nemotron-3-ultra-550b-a55b:free", "label": "Nemotron 3 Ultra 550B"},
-    {"id": "openai/gpt-oss-20b:free", "label": "GPT-OSS 20B"},
 ]
 MODEL_IDS = {m["id"] for m in MODELS}
 

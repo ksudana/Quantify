@@ -36,9 +36,11 @@ npm test
 - Powered by [OpenRouter](https://openrouter.ai). The API key stays server-side; the browser never sees it.
 - Model: pick from the in-app dropdown. It lists free OpenRouter models vetted to
   emit correct circuits for the test cases (Bell, GHZ, 2-/3-qubit Grover) —
-  currently Nemotron 3 Super 120B (default), Nemotron 3 Ultra 550B, and GPT-OSS 20B.
-  Offering several means a per-model rate limit doesn't block the app. Set
-  `OPENROUTER_MODEL` to change the server-side default (any OpenRouter slug).
+  Nemotron 3 Super 120B (default) and Nemotron 3 Ultra 550B. These were the only
+  free models that reliably passed 3-qubit Grover across repeated runs; others
+  (Gemma 4, Poolside, GPT-OSS 20B, Nemotron Nano, Cohere) failed it. Offering two
+  means a per-model rate limit doesn't block the app. Set `OPENROUTER_MODEL` to
+  change the server-side default (any OpenRouter slug).
 - Free models are non-deterministic: the same model occasionally emits a weaker
   circuit. When that happens the simulator flags unmodeled gates and the bars
   look off — just regenerate or switch models.
