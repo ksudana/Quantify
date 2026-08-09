@@ -23,6 +23,7 @@ ok((await page.title()).includes("Quantify"), "page loads");
 // Helper: render a circuit, run the simulator to completion, read the bars.
 async function simulate(spec) {
   return await page.evaluate((spec) => {
+    document.getElementById("backend").dataset.value = "simulator"; // ensure sim target
     outPanel.hidden = false;          // reveal the output panel
     renderCircuit(spec);              // draws diagram + wires the simulator
     simPause();                       // stop autoplay; step deterministically
@@ -128,6 +129,34 @@ async function simulate(spec) {
     [...document.querySelectorAll("#backend button")].find((b)=>b.dataset.v==="hardware").click();
   });
   ok(await page.locator("#sim").isHidden(), "IBM Hardware target: sim panel hidden");
+}
+
+// 8. Stress battery — diverse circuits with hand-derived expected outcomes,
+//    all run through the real moment-stepping path. Interference cases (a wrong
+//    phase changes the *outcome*, not just the color) and the span-hole case
+//    are regressions for the moment-ordering bug.
+{
+  const PI = Math.PI;
+  const cx = (c, t) => ({ name: "cx", controls: [c], targets: [t] });
+  const ghz = (n) => ({ qubits: n, gates: [{ name: "h", targets: [0] }, ...Array.from({ length: n - 1 }, (_, i) => cx(i, i + 1))] });
+  const stress = [
+    { name: "H·Z·H = X (interference)", spec: { qubits: 1, gates: [{ name: "h", targets: [0] }, { name: "z", targets: [0] }, { name: "h", targets: [0] }] }, expect: { "|1⟩": 100 } },
+    { name: "H·RZ(π)·H = X (phase interference)", spec: { qubits: 1, gates: [{ name: "h", targets: [0] }, { name: "rz", targets: [0], params: [PI] }, { name: "h", targets: [0] }] }, expect: { "|1⟩": 100 } },
+    { name: "RY(π/3) → 75/25 (rotation)", spec: { qubits: 1, gates: [{ name: "ry", targets: [0], params: [PI / 3] }] }, expect: { "|0⟩": 75, "|1⟩": 25 } },
+    { name: "Toffoli 11→1", spec: { qubits: 3, gates: [{ name: "x", targets: [0] }, { name: "x", targets: [1] }, { name: "ccx", controls: [0, 1], targets: [2] }] }, expect: { "|111⟩": 100 } },
+    { name: "GHZ-4", spec: ghz(4), expect: { "|0000⟩": 50, "|1111⟩": 50 } },
+    { name: "GHZ-5 (32 states)", spec: ghz(5), expect: { "|00000⟩": 50, "|11111⟩": 50 }, rows: 32 },
+    { name: "SWAP moves excitation q0→q2", spec: { qubits: 3, gates: [{ name: "x", targets: [0] }, { name: "swap", targets: [0, 2] }] }, expect: { "|100⟩": 100 } },
+    { name: "idle qubits stay |0⟩", spec: { qubits: 3, gates: [{ name: "x", targets: [1] }] }, expect: { "|010⟩": 100 } },
+    { name: "order preserved across span-hole", spec: { qubits: 3, gates: [{ name: "h", targets: [0] }, cx(0, 2), { name: "z", targets: [0] }, cx(0, 2), { name: "h", targets: [0] }] }, expect: { "|001⟩": 100 } },
+  ];
+  for (const t of stress) {
+    const r = await simulate(t.spec);
+    const keys = new Set([...Object.keys(t.expect), ...Object.keys(r.probs)]);
+    const good = [...keys].every((k) => Math.abs((r.probs[k] || 0) - (t.expect[k] || 0)) < 0.3);
+    ok(good, `${t.name} (${JSON.stringify(r.probs)})`);
+    if (t.rows) ok(r.barRows === t.rows, `  ${t.name}: ${t.rows} state rows rendered (${r.barRows})`);
+  }
 }
 
 ok(errors.length === 0, `no page/console errors${errors.length ? " -> " + errors.join(" | ") : ""}`);
