@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const BASE = "http://localhost:8000";
+const BASE = process.env.PW_BASE || "http://localhost:8000";
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { (cond ? pass++ : fail++); console.log(`${cond ? "PASS" : "FAIL"}  ${msg}`); };
 

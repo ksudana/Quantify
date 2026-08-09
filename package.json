@@ -5,10 +5,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/ui.mjs"
+    "test": "node tests/ui.mjs",
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public"
   },
   "license": "ISC",
   "devDependencies": {
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "wrangler": "^3.114.17"
   }
 }

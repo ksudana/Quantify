@@ -1,7 +1,16 @@
 # Quantify
 
-Describe a quantum use case in plain language; get a runnable Qiskit program.
-FastAPI backend + a single-page UI. Streams the response token-by-token via SSE.
+Describe a quantum use case in plain language; get a runnable Qiskit program,
+an interactive circuit diagram, and an in-browser simulator. Streams the
+response token-by-token via SSE.
+
+Two ways to run it:
+- **Local dev** — FastAPI (`app.py`), used for development and the test suite.
+- **Production** — Cloudflare Pages: static site in `public/` + serverless API in
+  `functions/api/` (Workers runtime). See *Deploy to Cloudflare Pages* below.
+
+Both serve the same static site and the same `/api/*` endpoints, so the front end
+is identical either way.
 
 ## Setup
 
@@ -18,6 +27,42 @@ uvicorn app:app --reload --port 8000
 ```
 
 Open http://localhost:8000
+
+## Deploy to Cloudflare Pages
+
+The API is ported to Cloudflare Pages Functions (`functions/api/generate.js`,
+`models.js`, `health.js`); `public/` is the static build output. `wrangler.toml`
+sets `pages_build_output_dir = "public"`.
+
+1. Provide the OpenRouter key as a **secret** (never committed):
+
+   ```bash
+   npx wrangler pages secret put OPENROUTER_API_KEY
+   # optional: change the default model
+   npx wrangler pages secret put OPENROUTER_MODEL
+   ```
+
+   Or set them under Pages → your project → Settings → Environment variables.
+
+2. Deploy:
+
+   ```bash
+   npm install
+   npm run deploy          # wrangler pages deploy public
+   ```
+
+   Or connect the GitHub repo in the Cloudflare dashboard with **build command:**
+   *(none)* and **build output directory:** `public` — functions are picked up
+   from `functions/` automatically.
+
+**Local preview on the real Workers runtime:**
+
+```bash
+echo "OPENROUTER_API_KEY=sk-or-..." > .dev.vars   # gitignored
+npm run dev             # wrangler pages dev public  → http://localhost:8788
+```
+
+Run the browser tests against it with `PW_BASE=http://localhost:8788 npm test`.
 
 ## Tests
 

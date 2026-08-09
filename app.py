@@ -38,7 +38,9 @@ def _resolve_model(requested: str | None) -> str:
 DEFAULT_KEY_FILE = os.path.expanduser(
     os.getenv("OPENROUTER_KEY_FILE", "~/.openrouter/keys/quantify_ai")
 )
-STATIC_DIR = Path(__file__).parent / "static"
+# Static site lives in public/ (also the Cloudflare Pages build output dir).
+PUBLIC_DIR = Path(__file__).parent / "public"
+STATIC_DIR = PUBLIC_DIR / "static"
 
 
 def _api_key() -> str | None:
@@ -224,7 +226,7 @@ async def models() -> dict:
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(PUBLIC_DIR / "index.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
