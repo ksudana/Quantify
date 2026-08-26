@@ -213,15 +213,19 @@ function maybeDrawCircuit(md) {
 
 // Draw a Qiskit-style circuit from the structured spec. Pure SVG, no code
 // execution. Self-contained (embedded <style>) so the saved file renders too.
-function renderCircuit(spec) {
-  circuitPanel.hidden = false;
+// opts.host/opts.hlId redirect the output (Learn tab); opts.silent skips the
+// generate-view sim wiring and just returns the parsed model.
+function renderCircuit(spec, opts = {}) {
+  const live = !opts.silent;
+  const host = opts.host || circuitSvg;
+  const hlId = opts.hlId || "cg-hl";
+  if (live) circuitPanel.hidden = false;
   const nq = Math.max(0, spec.qubits | 0);
   const gates = Array.isArray(spec.gates) ? spec.gates : [];
   if (!nq || gates.length === 0) {
-    circuitSvg.innerHTML = `<div class="cg-empty">No circuit diagram for this use case.</div>`;
-    circuitModel = null;
-    syncSimVisibility();
-    return;
+    host.innerHTML = `<div class="cg-empty">No circuit diagram for this use case.</div>`;
+    if (live) { circuitModel = null; syncSimVisibility(); }
+    return null;
   }
   const nc = Math.max(0, spec.clbits | 0);
 
@@ -270,7 +274,7 @@ function renderCircuit(spec) {
   const H = TOP * 2 + (nq + nc) * ROWH;
   const P = [];
   // Column highlight band the simulator moves as it steps (behind everything).
-  P.push(`<rect id="cg-hl" x="${LEFT}" y="${TOP}" width="${COLW}" height="${(nq + nc) * ROWH}" rx="6" class="cg-hl" style="opacity:0"/>`);
+  P.push(`<rect id="${hlId}" x="${LEFT}" y="${TOP}" width="${COLW}" height="${(nq + nc) * ROWH}" rx="6" class="cg-hl" style="opacity:0"/>`);
 
   const line = (x1, y1, x2, y2, cls = "cg-line") =>
     P.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"/>`);
@@ -371,14 +375,18 @@ function renderCircuit(spec) {
     .cg-arc{fill:none;stroke:#053b36;stroke-width:1.6}
     .cg-hl{fill:rgba(124,92,255,.18)}
   </style>`;
-  circuitSvg.innerHTML =
+  host.innerHTML =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${style}${P.join("")}</svg>`;
 
   // Group gates into moments (columns) for the simulator, and publish the model.
   const moments = Array.from({ length: ncols }, () => []);
   for (const { g, col } of placed) moments[col].push(g);
-  circuitModel = { nq, nc, moments, ncols, layout: { LEFT, COLW } };
-  syncSimVisibility();
+  const model = { nq, nc, moments, ncols, layout: { LEFT, COLW, TOP, ROWH, W, H } };
+  if (live) {
+    circuitModel = model;
+    syncSimVisibility();
+  }
+  return model;
 }
 
 /* ---------- in-browser statevector simulator ---------- */
@@ -407,6 +415,14 @@ function gateMatrix(name, params) {
 }
 
 const sim = { re: null, im: null, n: 0, moments: [], step: 0, timer: null, rows: [], layout: null };
+
+// Fresh |0…0⟩ statevector, shared by the generate-view sim and the Learn tab.
+function freshState(n) {
+  const size = 1 << n;
+  const re = new Float64Array(size), im = new Float64Array(size);
+  re[0] = 1;
+  return { re, im, n };
+}
 
 function applyU(re, im, n, target, controls, U) {
   const tb = 1 << target, size = 1 << n;
@@ -438,8 +454,9 @@ function applySwap(re, im, n, a, b, controls) {
   }
 }
 
-function applyGate(g) {
-  const { re, im, n } = sim;
+// Apply one gate to an arbitrary statevector (pure — no sim globals), so the
+// Learn tab reuses the exact same physics.
+function applyGateTo(re, im, n, g) {
   if (g.name === "barrier" || g.name === "measure") return;
   const base = baseGate(g.name);
   // A qubit can't control itself — some models list the target inside controls
@@ -458,6 +475,10 @@ function applyGate(g) {
     const ctrls = g.controls.filter((c) => c !== t);
     applyU(re, im, n, t, ctrls, U);
   }
+}
+
+function applyGate(g) {
+  applyGateTo(sim.re, sim.im, sim.n, g);
 }
 
 const ketBits = (s, n) => {
@@ -742,6 +763,7 @@ buildReference();
 
 async function generate() {
   if (busy) return;
+  if (document.getElementById("genView")?.hidden) return; // Learn tab is active
   const text = usecase.value.trim();
   if (text.length < 3) { usecase.focus(); return; }
 

@@ -4,6 +4,12 @@ Describe a quantum use case in plain language; get a runnable Qiskit program,
 an interactive circuit diagram, and an in-browser simulator. Streams the
 response token-by-token via SSE.
 
+There's also a **Learn** tab: six interactive lessons (first qubit → phases →
+Bell/GHZ entanglement → Deutsch–Jozsa → Grover) where you build circuits on
+clickable wires, step the statevector, answer quizzes, and have each challenge
+checked by the in-browser simulator. Progress persists in `localStorage`
+(`lessons.js` = content, `learn.js` = player).
+
 Two ways to run it:
 - **Local dev** — FastAPI (`app.py`), used for development and the test suite.
 - **Production** — Cloudflare Pages: static site in `public/` + serverless API in
@@ -67,7 +73,8 @@ Run the browser tests against it with `PW_BASE=http://localhost:8788 npm test`.
 ## Tests
 
 Real-browser UI tests (simulator correctness, circuit diagram, hover tooltips,
-Reference overlay) via Playwright, run against a live server:
+Reference overlay, Learn tab: builder/quiz/progress) via Playwright, run
+against a live server:
 
 ```bash
 npm install

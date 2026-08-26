@@ -179,6 +179,89 @@ async function simulate(spec) {
   await page.unroute("**/api/generate");
 }
 
+// 10. Learn tab — catalog, builder-driven Bell-style warm-up, quiz gating,
+//     and progress persistence. Drives the real UI (palette + wire clicks).
+{
+  await page.click("#tabLearn");
+  ok(await page.locator("#genView").isHidden(), "learn: generate view hidden");
+  await page.waitForSelector(".lesson-card");
+  const cards = await page.locator(".lesson-card").count();
+  ok(cards >= 6, `learn: catalog renders ${cards} lessons`);
+
+  // Open lesson 1 (Your First Qubit) — step 0 is text, Next already unlocked.
+  await page.locator(".lesson-card").first().click();
+  ok(!(await page.locator("#learnPlayer").isHidden()), "learn: player opens");
+  ok((await page.textContent("#lpTitle")).includes("First Qubit"), `learn: title ("${await page.textContent("#lpTitle")}")`);
+  ok(!(await page.locator("#lpNext").isDisabled()), "learn: text step unlocks Next");
+
+  // Step 1 — build warm-up: place X on q0 via palette + wire click, run.
+  await page.click("#lpNext");
+  await page.click('.pal-btn[data-pal="x"]');
+  ok((await page.textContent(".b-status")).includes("click"), "build: status prompts for a wire");
+  await page.click('#bCircuit .lp-wire[data-q="0"]');
+  const placedSel = '#bCircuit .cg-gate:not([data-gate="barrier"])'; // empty canvas keeps a barrier
+  ok((await page.locator(placedSel).count()) === 1, "build: X drawn on the wire (1 gate)");
+  await page.click("#bRun");
+  await page.waitForSelector("#bFeed.ok", { timeout: 5000 });
+  ok(true, "build: X-flip passes validation");
+  ok(!(await page.locator("#lpNext").isDisabled()), "build: passing unlocks Next");
+
+  // Undo removes the gate; re-place and pass again to keep progress moving.
+  await page.click("#bUndo");
+  ok((await page.locator(placedSel).count()) === 0, "build: undo clears the gate");
+  await page.click('.pal-btn[data-pal="x"]');
+  await page.click('#bCircuit .lp-wire[data-q="0"]');
+  await page.click("#bRun");
+  await page.waitForSelector("#bFeed.ok", { timeout: 5000 });
+
+  // Step 2 text → step 3 build: superposition with H.
+  await page.click("#lpNext"); // text
+  await page.click("#lpNext"); // build split
+  await page.click('.pal-btn[data-pal="h"]');
+  await page.click('#bCircuit .lp-wire[data-q="0"]');
+  await page.click("#bRun");
+  await page.waitForSelector("#bFeed.ok", { timeout: 5000 });
+  ok(true, "build: H superposition passes validation");
+
+  // Step 4 quiz: wrong answer flags, right answer unlocks.
+  await page.click("#lpNext");
+  await page.click(".quiz-opt >> nth=0");
+  ok(await page.locator(".quiz-opt.wrong").count() === 1, "quiz: wrong pick flagged");
+  ok(await page.locator("#lpNext").isDisabled(), "quiz: wrong pick keeps Next locked");
+  await page.click(".quiz-opt >> nth=1");
+  ok(await page.locator(".quiz-opt.correct").count() === 1, "quiz: correct pick accepted");
+  ok(!(await page.locator("#lpNext").isDisabled()), "quiz: correct pick unlocks Next");
+
+  // Progress persists across reloads.
+  await page.reload({ waitUntil: "networkidle" });
+  await page.click("#tabLearn");
+  const badge = await page.textContent(".lesson-card .lc-state");
+  ok(/Continue|✓/.test(badge), `progress persisted after reload ("${badge}")`);
+
+  // Grover lesson exists and its final build validates against a known solution.
+  const groverIdx = await page.evaluate(() => LESSONS.findIndex((l) => l.id === "grover"));
+  ok(groverIdx >= 0, "learn: Grover lesson present");
+  if (groverIdx >= 0) {
+    await page.evaluate((i) => window.__quantifyLearn.openLesson(i), groverIdx);
+    // Walk text -> explore (any control interaction unlocks it) -> build.
+    await page.click("#lpNext");
+    await page.locator("#lpBody .sim-ctrls button").first().click();
+    await page.click("#lpNext");
+    if ((await page.locator("#bRun").count()) !== 1) throw new Error("did not reach Grover build step");
+    // Two failed checks reveal the reference solution; loading it must validate.
+    await page.click("#bRun");
+    await page.waitForSelector("#bFeed.bad", { timeout: 5000 });
+    await page.click("#bRun");
+    await page.waitForSelector("#bFeed .b-solution", { timeout: 5000 });
+    await page.click("#bFeed .b-solution");
+    await page.waitForSelector("#bFeed.ok", { timeout: 15000 });
+    ok(true, "Grover: solution circuit reaches |11⟩ ≥ 85%");
+  }
+
+  await page.click("#tabGen");
+  ok(await page.locator("#learnView").isHidden(), "learn: switching back restores generate view");
+}
+
 ok(errors.length === 0, `no page/console errors${errors.length ? " -> " + errors.join(" | ") : ""}`);
 
 await browser.close();

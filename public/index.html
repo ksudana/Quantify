@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Quantify — Qiskit code from plain language</title>
-<link rel="stylesheet" href="/static/style.css?v=6" />
+<link rel="stylesheet" href="/static/style.css?v=7" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚛️</text></svg>" />
 </head>
 <body>
@@ -19,6 +19,10 @@
       <p class="tag">Describe a quantum use case. Get runnable Qiskit.</p>
     </div>
   </div>
+  <nav class="tabs" aria-label="Sections">
+    <button id="tabGen" class="active">Generate</button>
+    <button id="tabLearn">Learn</button>
+  </nav>
   <div class="head-right">
     <button id="refBtn" class="ghost">Reference</button>
     <span class="pill" id="status">checking…</span>
@@ -26,7 +30,8 @@
 </header>
 
 <main>
-  <section class="panel input-panel">
+  <div id="genView">
+    <section class="panel input-panel">
     <label class="field-label" for="usecase">Use case</label>
     <div class="ta-wrap">
       <div id="ghost" class="ghost-text" aria-hidden="true"></div>
@@ -100,6 +105,39 @@
 
     <article id="out" class="out"></article>
   </section>
+  </div><!-- /genView -->
+
+  <div id="learnView" hidden>
+    <div class="panel learn-intro">
+      <div>
+        <h2>Learn quantum circuits by building them</h2>
+        <p>Six hands-on lessons, from your first qubit to Grover's search. Every step
+        runs in your browser — place gates on real wires and check the statevector yourself.</p>
+      </div>
+      <button id="learnReset" class="ghost">Reset progress</button>
+    </div>
+
+    <div id="learnCatalog" class="lesson-grid"></div>
+
+    <section class="panel" id="learnPlayer" hidden>
+      <div class="lp-head">
+        <button id="lpBack" class="ghost">← Lessons</button>
+        <div class="lp-title-wrap">
+          <span id="lpLevel" class="lv"></span>
+          <h2 id="lpTitle"></h2>
+        </div>
+        <div id="lpDots" class="lp-dots"></div>
+      </div>
+      <div id="lpBody"></div>
+      <div class="lp-foot" id="lpFoot">
+        <span id="lpProgressTxt" class="lp-ptext"></span>
+        <div class="lp-nav">
+          <button id="lpPrev" class="ghost">← Back</button>
+          <button id="lpNext" class="go lp-next">Next →</button>
+        </div>
+      </div>
+    </section>
+  </div><!-- /learnView -->
 </main>
 
 <footer>Powered by OpenRouter · targets the modern Qiskit primitives API</footer>
@@ -120,6 +158,8 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=6"></script>
+<script src="/static/app.js?v=7"></script>
+<script src="/static/lessons.js?v=7"></script>
+<script src="/static/learn.js?v=7"></script>
 </body>
 </html>
