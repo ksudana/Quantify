@@ -1,5 +1,9 @@
 # Quantify
 
+[Live demo →](https://quantify.pages.dev)
+
+![Quantify screenshot](docs/screenshot.png)
+
 Describe a quantum use case in plain language; get a runnable Qiskit program,
 an interactive circuit diagram, and an in-browser simulator. Streams the
 response token-by-token via SSE.
